@@ -1,0 +1,242 @@
+Image Classification on any custom dataset
+
+
+I have learned them from FastAI
+
+Please Upvote my kernel and keep it in your favourite section if you think it is helpful.
+
+
+Table of content
+Introduction
+
+1. What is Deep Learning ?
+2. What is CNN ?
+Library
+
+1. Installation
+2. Import Libraries
+Load and view your data
+
+1. Setting up path for training data
+2. Data Loading For training
+3. Data Explorations
+4. Print Classes present in the data
+Create and train a model
+
+1. Create Models
+2. Train Model
+3. Finding LR
+4. Finetuning HyperParameter
+Others
+
+1. Interpret the results
+2. Prediction Using Trained Model
+3. Save and Load Model
+4. Sources
+1.1 What is Deep Learning ?
+
+image.png
+
+
+Deep learning is a subset of machine learning concerned with the emulation of human brain activities in software programs using layers of artificial neural networks (ANN), which work similar to the human brain at some levels.
+
+1.2 What is CNN ?
+
+CNN stands for Convolutional Neural Network which is a specialized neural network for processing data that has an input shape like a 2D matrix like images. CNN's are typically used for image detection and classification.
+
+2.1 Installation of Libraries
+
+!pip install fastai
+2.2 Library Import
+
+#importing libraries
+from fastai import *
+from fastai.vision import *
+from fastai.metrics import error_rate
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import cv2
+3.1 Setting up path for training data
+
+Point to be Noted: Number of elements in a list of path is same as number of classes you have
+
+x  = '/kaggle/input/intel-image-classification/seg_train/seg_train'
+path = Path(x)
+path.ls()
+[PosixPath('/kaggle/input/intel-image-classification/seg_train/seg_train/mountain'),
+ PosixPath('/kaggle/input/intel-image-classification/seg_train/seg_train/street'),
+ PosixPath('/kaggle/input/intel-image-classification/seg_train/seg_train/buildings'),
+ PosixPath('/kaggle/input/intel-image-classification/seg_train/seg_train/sea'),
+ PosixPath('/kaggle/input/intel-image-classification/seg_train/seg_train/forest'),
+ PosixPath('/kaggle/input/intel-image-classification/seg_train/seg_train/glacier')]
+3.2 Data Loading For training
+
+Things to be remember:
+
+Decide validation percentage ( 0.2 => 20% )
+Provide path for training data
+Decide augmentations criteria (optional)
+Decide image size (which is 224 in my case)
+Test data can also be added but it's optional
+np.random.seed(40)
+data = ImageDataBunch.from_folder(path, train = '.', valid_pct=0.2,
+                                  ds_tfms=get_transforms(), size=224,
+                                  num_workers=4).normalize(imagenet_stats)
+3.3 Data Explorations
+
+Our image dataset is stored as .jpg files in 2 different folders, with each folder bearing the name of model of the images contained in the folder. We use the ImageDataBunch.from_folder() function to load the images and assign labels the images based on the name of the folder they’re read from.
+
+data.show_batch(rows=3, figsize=(7,6),recompute_scale_factor=True)
+
+3.4 Print Classes present in the data
+
+data.c — How many classes are there in our dataset?
+len(data.train_ds) — What is the size of our training dataset?
+len(data.valid_ds) — What is the size of our validation dataset?
+data
+ImageDataBunch;
+
+Train: LabelList (11228 items)
+x: ImageList
+Image (3, 224, 224),Image (3, 224, 224),Image (3, 224, 224),Image (3, 224, 224),Image (3, 224, 224)
+y: CategoryList
+mountain,mountain,mountain,mountain,mountain
+Path: /kaggle/input/intel-image-classification/seg_train/seg_train;
+
+Valid: LabelList (2806 items)
+x: ImageList
+Image (3, 224, 224),Image (3, 224, 224),Image (3, 224, 224),Image (3, 224, 224),Image (3, 224, 224)
+y: CategoryList
+sea,mountain,mountain,mountain,mountain
+Path: /kaggle/input/intel-image-classification/seg_train/seg_train;
+
+Test: None
+print(data.classes)
+len(data.classes)
+data.c
+['buildings', 'forest', 'glacier', 'mountain', 'sea', 'street']
+6
+4.1 Create Model
+
+We now use a pre-trained ResNet18 Convolutional Neural Net model, and use transfer learning to learn weights of only the last layer of the network.
+Why Transfer learning? Because with transfer learning, you begin with an existing (trained) neural network used for image recognition — and then tweak it a bit (or more) here and there to train a model for your particular use case. And why do we do that? Training a reasonable neural network would mean needing approximately 300,000 image samples, and to achieve really good performance, we’re going to need at least a million images.
+In our case, we have approximately 2500 images in our training set — you have one guess to decide if that would have been enough if were to train a neural net from scratch.
+We use the create_cnn() function for loading a pre-trained ResNet18 network, that was trained on around a million images from the ImageNet database.
+learn = cnn_learner(data, models.resnet18, metrics=[accuracy], model_dir = Path('../kaggle/working'),path = Path("."))
+Downloading: "https://download.pytorch.org/models/resnet18-5c106cde.pth" to /root/.cache/torch/checkpoints/resnet18-5c106cde.pth
+100%
+44.7M/44.7M [00:48<00:00, 962kB/s]
+4.2 Finding LR
+
+learn.lr_find()
+learn.recorder.plot(suggestions=True)
+
+ 0.00% [0/1 00:00<00:00]
+epoch	train_loss	valid_loss	accuracy	time
+
+ 50.86% [89/175 00:44<00:42 5.4253]
+LR Finder is complete, type {learner_name}.recorder.plot() to see the graph.
+
+4.3 Train Model
+
+lr1 = 1e-3
+lr2 = 1e-1
+learn.fit_one_cycle(40,slice(lr1,lr2))
+epoch	train_loss	valid_loss	accuracy	time
+0	0.405578	0.290146	0.901283	01:33
+1	0.383602	0.299907	0.902708	01:29
+2	0.336319	0.306456	0.911974	01:29
+3	0.343718	0.326254	0.892374	01:30
+4	0.364961	0.304092	0.906985	01:29
+5	0.515605	0.546500	0.875624	01:30
+6	0.622033	0.581009	0.892730	01:30
+7	0.681928	0.578457	0.893443	01:30
+8	1.094560	1.054756	0.897006	01:29
+9	0.889135	1.874039	0.889522	01:30
+10	0.922833	0.993172	0.873129	01:30
+11	1.075472	0.505854	0.904847	01:30
+12	0.880544	1.152409	0.903421	01:29
+13	0.948685	0.579885	0.908767	01:29
+14	0.899647	4.366896	0.711689	01:30
+15	1.108699	1.961280	0.892374	01:28
+16	0.901288	0.625867	0.907698	01:29
+17	0.689079	3.617636	0.872416	01:30
+18	0.530735	0.456810	0.907341	01:28
+19	0.805070	0.463680	0.915538	01:30
+20	0.774058	0.893849	0.915895	01:31
+21	0.581867	0.590447	0.906272	01:31
+22	0.486774	0.639138	0.922666	01:30
+23	0.482500	0.359934	0.919815	01:30
+24	0.449640	21.844734	0.829294	01:30
+25	0.326962	0.478932	0.924448	01:29
+26	0.301796	0.600344	0.915182	01:29
+27	0.270193	0.612086	0.913756	01:29
+28	0.298829	0.291706	0.926230	01:29
+29	0.233580	0.258509	0.920884	01:29
+30	0.228145	0.269283	0.926230	01:29
+31	0.212270	0.298909	0.927299	01:29
+32	0.179242	0.326935	0.927655	01:29
+33	0.185605	0.218010	0.931219	01:28
+34	0.179383	0.349236	0.928724	01:28
+35	0.166706	0.221297	0.934783	01:29
+36	0.163385	0.212441	0.933001	01:29
+37	0.141837	0.209331	0.934783	01:29
+38	0.155481	0.211586	0.934426	01:29
+39	0.151176	0.230446	0.933713	01:29
+4.4 Hyper Parameter Tuning
+
+learn.unfreeze()
+learn.fit_one_cycle(20,slice(1e-4,1e-3))
+epoch	train_loss	valid_loss	accuracy	time
+0	0.159835	0.224613	0.935495	01:29
+1	0.180235	0.768976	0.919815	01:30
+2	0.219724	0.273913	0.918746	01:31
+3	0.214327	0.249109	0.926230	01:30
+4	0.225790	1.400049	0.875267	01:31
+5	0.208292	0.335781	0.908054	01:31
+6	0.204567	0.318150	0.900570	01:31
+7	0.182223	0.239845	0.919458	01:30
+8	0.174720	0.263758	0.914469	01:31
+9	0.139013	0.239959	0.928368	01:31
+10	0.151706	0.230929	0.931219	01:30
+11	0.113556	0.216972	0.935495	01:30
+12	0.097784	1.365048	0.932644	01:29
+13	0.072197	0.321990	0.935139	01:34
+14	0.067746	0.215753	0.941197	01:32
+15	0.053457	0.234636	0.935852	01:28
+16	0.046622	0.223260	0.941554	01:29
+17	0.034932	0.220026	0.941910	01:30
+18	0.030557	0.431193	0.940841	01:30
+19	0.030724	0.221086	0.942623	01:29
+learn.recorder.plot_losses()
+
+5.1 Interpret the results
+
+Model performance can be validated in different ways. One of the popular methods is using the confusion matrix. Diagonal values of the matrix indicate correct predictions for each class, whereas other cell values indicate a number of wrong predictions.
+
+interp = ClassificationInterpretation.from_learner(learn)
+interp.plot_confusion_matrix()
+
+interp.plot_top_losses(6,figsize = (25,5))
+
+5.2 Prediction Using Trained Model
+
+img = open_image('/kaggle/input/intel-image-classification/seg_test/seg_test/glacier/21982.jpg')
+print(learn.predict(img)[0])
+glacier
+5.3 Save and Load Model
+
+img = open_image('/kaggle/input/intel-image-classification/seg_test/seg_test/glacier/21982.jpg')
+print(learn.predict(img)[0])
+glacier
+learn.export(file = Path("/kaggle/working/export.pkl"))
+learn.model_dir = "/kaggle/working"
+learn.save("stage-1",return_path=True)
+PosixPath('/kaggle/working/stage-1.pth')
+5.4 Sources
+
+Fastai MOOC
+Fastai library
